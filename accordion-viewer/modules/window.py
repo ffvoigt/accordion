@@ -43,19 +43,39 @@ class Window(QtWidgets.QMainWindow):
 
         ''' Setting up the state '''
         self.state = SingletonStateObject()
-        print('Window State ID:', id(self.state))
-        print('Window Mutex ID: ', id(self.state.mutex))
+        #print('Window State ID:', id(self.state))
+        #print('Window Mutex ID: ', id(self.state.mutex))
         self.state.state_updated.connect(lambda string: print('Window thread received state update: ',string))
         # self.logger = SingletonLoggerObject('my_log_file.txt')
         # print('ID Window Logger: ', id(self.logger))
 
-        self.w1 = self.graphicsView.addPlot()
+        print(type(self.graphicsView))
+
+        self.XY_plot_layout = self.graphicsView.addLayout(row=0, col=0, rowspan=2, colspan=1, border=(50,50,0))
+        self.XY_plot = self.XY_plot_layout.addPlot()
+        self.ET_plot = self.graphicsView.addPlot(row=2, col=0, rowspan=1, colspan=1)
+        self.ET_region_selection_plot = self.graphicsView.addPlot(row=3, col=0, rowspan=1, colspan=1)
+        self.XY_plot.setAspectLocked(True, ratio=1.77)
+
+        self.ET_region = pg.LinearRegionItem(values=[1000,2000])
+        self.ET_region.setZValue(10) # Move item up 
+
+        self.ET_region_selection_plot.addItem(self.ET_region, ignoreBounds = True)
+        self.ET_plot.setAutoVisible(y=True)
+
+        data1 = 10000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
+        data2 = 15000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
+
+        self.ET_plot.plot(data1, pen="r")
+        self.ET_region_selection_plot.plot(data1, pen="r")
+
+        self.ET_region.sigRegionChanged.connect(self.update)
 
         self.s4 = pg.ScatterPlotItem(
-                    size=10,
+                    size=2,
                     pen=pg.mkPen(None),
                     brush=pg.mkBrush(255, 255, 255, 20),
-                    hoverable=True,
+                    hoverable=False,
                     hoverSymbol='s',
                     hoverSize=15,
                     hoverPen=pg.mkPen('r', width=2),
@@ -69,12 +89,12 @@ class Window(QtWidgets.QMainWindow):
                             # brush=[pg.mkBrush(x) for x in np.random.randint(0, 256, (n, 3))],
                             data=np.arange(self.n)
                             )
-        self.w1.addItem(self.s4)
+        self.XY_plot.addItem(self.s4)
 
         self.clickedPen = pg.mkPen('b', width=2)
         self.lastClicked = []    
 
-        self.s4.sigClicked.connect(self.clicked)
+        # self.s4.sigClicked.connect(self.clicked)
 
         ''' Set the thread up '''
         self.my_thread = QtCore.QThread()
@@ -110,6 +130,11 @@ class Window(QtWidgets.QMainWindow):
             self.my_thread1.wait()
         except:
             pass
+
+    def update(self, viewRange):
+        self.ET_region.setZValue(10)
+        minX, maxX = self.ET_region.getRegion()
+        self.ET_plot.setXRange(minX, maxX, padding=0)
 
     def initialize_and_connect_menubar(self):
         self.actionExit_2.triggered.connect(self.close_app)

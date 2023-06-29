@@ -30,8 +30,8 @@ class WorkerObject(QtCore.QObject):
         This is a form of callbacks
         '''
         self.state = SingletonStateObject()
-        print('Worker State ID:', id(self.state))
-        print('Worker Mutex ID: ', id(self.state.mutex))
+        #print('Worker State ID:', id(self.state))
+        #print('Worker Mutex ID: ', id(self.state.mutex))
 
         self.parent.sig_start.connect(self.start)
 
