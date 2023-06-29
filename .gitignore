@@ -4,3 +4,7 @@ playground/example_data/
 playground/__pycache__/
 
 *.tif
+
+*.pyc
+
+accordion-viewer/log/
