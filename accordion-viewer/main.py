@@ -9,7 +9,7 @@ import qdarkstyle
 
 from PyQt5 import QtWidgets
 
-from modules.window import Window
+from modules.accordion_window import AccordionMainWindow
 from config.config import my_config as cfg
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
@@ -21,7 +21,7 @@ logger.info('Accordion started')
 def main():
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
-    ex = Window(cfg)
+    ex = AccordionMainWindow(cfg)
     ex.show()
     sys.exit(app.exec_())
 

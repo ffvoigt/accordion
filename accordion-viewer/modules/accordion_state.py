@@ -5,7 +5,7 @@ import time
 
 from PyQt5 import QtCore
 
-class SingletonStateObject():
+class AccordionSingletonStateObject():
     instance = None
 
     def __new__(cls):

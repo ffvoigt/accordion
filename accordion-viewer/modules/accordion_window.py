@@ -4,8 +4,9 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.uic import loadUi
 import qdarkstyle
 
-from .worker import WorkerObject, AnotherWorkerObject
-from .state import SingletonStateObject
+# from .worker import WorkerObject, AnotherWorkerObject
+from .accordion_state import AccordionSingletonStateObject
+from .accordion_camera import AccordionCamera
 
 import pyqtgraph as pg
 import numpy as np
@@ -17,12 +18,15 @@ from metavision_core.event_io import EventsIterator
 import logging
 logger = logging.getLogger(__name__)
 
-class Window(QtWidgets.QMainWindow):
+class AccordionMainWindow(QtWidgets.QMainWindow):
     '''
     Main application window which instantiates worker objects and moves them
     to a thread.
     '''
     sig_start = QtCore.pyqtSignal()
+    sig_run_live = QtCore.pyqtSignal()
+    sig_end_live = QtCore.pyqtSignal()
+    sig_stop = QtCore.pyqtSignal()
 
     def __init__(self, config):
         super().__init__()
@@ -34,12 +38,13 @@ class Window(QtWidgets.QMainWindow):
         
         ''' Set up the UI '''
         loadUi('gui/accordion_gui.ui', self)
-        self.setWindowTitle('Accordion Event Browser')
+        self.setWindowTitle('Accordion')
 
         self.initialize_and_connect_menubar()
 
         ''' Set up the basic slots '''
         self.startButton.clicked.connect(self.start)
+        self.stopButton.clicked.connect(self.stop)
 
         ''' Setting up the state '''
         self.state = SingletonStateObject()
@@ -53,26 +58,26 @@ class Window(QtWidgets.QMainWindow):
 
         self.XY_plot_layout = self.graphicsView.addLayout(row=0, col=0, rowspan=2, colspan=1, border=(50,50,0))
         self.XY_plot = self.XY_plot_layout.addPlot()
-        self.ET_plot = self.graphicsView.addPlot(row=2, col=0, rowspan=1, colspan=1)
-        self.ET_region_selection_plot = self.graphicsView.addPlot(row=3, col=0, rowspan=1, colspan=1)
+        # self.ET_plot = self.graphicsView.addPlot(row=2, col=0, rowspan=1, colspan=1, border=(50,50,0))
+        # self.ET_region_selection_plot = self.graphicsView.addPlot(row=3, col=0, rowspan=1, colspan=1, border=(50,50,0))
         self.XY_plot.setAspectLocked(True, ratio=1.77)
 
-        self.ET_region = pg.LinearRegionItem(values=[1000,2000])
-        self.ET_region.setZValue(10) # Move item up 
+        # self.ET_region = pg.LinearRegionItem(values=[1000,2000])
+        # self.ET_region.setZValue(10) # Move item up 
 
-        self.ET_region_selection_plot.addItem(self.ET_region, ignoreBounds = True)
-        self.ET_plot.setAutoVisible(y=True)
+        # self.ET_region_selection_plot.addItem(self.ET_region, ignoreBounds = True)
+        # self.ET_plot.setAutoVisible(y=True)
 
-        data1 = 10000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
-        data2 = 15000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
+        #data1 = 10000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
+        #data2 = 15000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
 
-        self.ET_plot.plot(data1, pen="r")
-        self.ET_region_selection_plot.plot(data1, pen="r")
+        #self.ET_plot.plot(data1, pen="r")
+        #self.ET_region_selection_plot.plot(data1, pen="r")
 
-        self.ET_region.sigRegionChanged.connect(self.update)
+        #self.ET_region.sigRegionChanged.connect(self.update)
 
         self.s4 = pg.ScatterPlotItem(
-                    size=2,
+                    size=3,
                     pen=pg.mkPen(None),
                     brush=pg.mkBrush(255, 255, 255, 20),
                     hoverable=False,
@@ -81,14 +86,17 @@ class Window(QtWidgets.QMainWindow):
                     hoverPen=pg.mkPen('r', width=2),
                     hoverBrush=pg.mkBrush('g'),
                     )
+        
         self.n = 10000
         self.pos = np.random.normal(size=(2, self.n), scale=1e-9)
+
         self.s4.addPoints(x=self.pos[0],
-                            y=self.pos[1],
+                          y=self.pos[1],
                             # size=(np.random.random(n) * 20.).astype(int),
                             # brush=[pg.mkBrush(x) for x in np.random.randint(0, 256, (n, 3))],
                             data=np.arange(self.n)
                             )
+        
         self.XY_plot.addItem(self.s4)
 
         self.clickedPen = pg.mkPen('b', width=2)
@@ -97,26 +105,16 @@ class Window(QtWidgets.QMainWindow):
         # self.s4.sigClicked.connect(self.clicked)
 
         ''' Set the thread up '''
-        self.my_thread = QtCore.QThread()
-        self.my_worker = WorkerObject(self)
-        self.my_worker.moveToThread(self.my_thread)
-
-        ''' Setting another thread up '''
-        self.my_thread1 = QtCore.QThread()
-        self.my_worker1 = AnotherWorkerObject(self)
-        self.my_worker1.moveToThread(self.my_thread1)
+        self.camera_thread = QtCore.QThread()
+        self.camera_worker = AccordionCamera(self)
+        self.camera_worker.moveToThread(self.camera_thread)
 
         ''' Create the connections '''
-        self.my_worker.status.connect(self.update_progressbar)
-
-        ''' The Signal Switchboard '''
-        self.my_worker.started.connect(self.test1)
-        self.my_worker.finished.connect(self.test2)
+        self.camera_worker.sig_camera_datachunk.connect(self.update_display)
 
         '''Start the thread'''
-        self.my_thread.start()
-        self.my_thread1.start()
-
+        self.camera_thread.start()
+        
     def __del__(self):
         '''Cleans the thread up after deletion, waits until the thread
         has truly finished its life.
@@ -124,17 +122,20 @@ class Window(QtWidgets.QMainWindow):
         Uses "try" in case things crash before the thread was even started.
         '''
         try:
-            self.my_thread.quit()
-            self.my_thread1.quit()
-            self.my_thread.wait()
-            self.my_thread1.wait()
+            self.self.camera_thread.quit()
+            self.self.camera_thread.wait()
         except:
             pass
-
-    def update(self, viewRange):
+    
+    @QtCore.pyqtSlot(np.ndarray)
+    def update_display(self, datachunk):
+        print('updating display')
+        pass
+        '''
         self.ET_region.setZValue(10)
         minX, maxX = self.ET_region.getRegion()
         self.ET_plot.setXRange(minX, maxX, padding=0)
+        '''
 
     def initialize_and_connect_menubar(self):
         self.actionExit_2.triggered.connect(self.close_app)
@@ -143,18 +144,6 @@ class Window(QtWidgets.QMainWindow):
     def close_app(self):
         self.__del__()
         self.close()
-
-    def load_dataset(self):
-        path , _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Open File')
-
-        ''' To avoid crashes, only set the cfg file when a file has been selected:'''
-        if path:
-            path = path.decode('ascii')
-            print(path)
-            logger.info(f'Main Window: Chosen File: {path}')
-            self.record_raw = RawReader(path)
-            print(record_raw)
-            self.events = self.record_raw.load_n_events(10000)
 
     def clicked(self, plot, points):
         for p in self.lastClicked:
@@ -172,9 +161,9 @@ class Window(QtWidgets.QMainWindow):
 
     def start(self):
         self.sig_start.emit()
+        self.sig_run_live.emit()
 
-    def test1(self):
-        print('Start signal received')
+    def stop(self):
+        self.sig_stop.emit()
 
-    def test2(self):
-        print('Finished signal received')
+

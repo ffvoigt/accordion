@@ -8,3 +8,5 @@ playground/__pycache__/
 *.pyc
 
 accordion-viewer/log/
+
+accordion-viewer/modules/legacy_mesoSPIM_Core.py
