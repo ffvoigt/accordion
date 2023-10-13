@@ -11,10 +11,6 @@ from .accordion_camera import AccordionCamera
 import pyqtgraph as pg
 import numpy as np
 
-from metavision_core.event_io.raw_reader import RawReader
-from metavision_core.event_io.py_reader import EventDatReader
-from metavision_core.event_io import EventsIterator
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -24,6 +20,7 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
     to a thread.
     '''
     sig_start = QtCore.pyqtSignal()
+    sig_prepare_live = QtCore.pyqtSignal()
     sig_run_live = QtCore.pyqtSignal()
     sig_end_live = QtCore.pyqtSignal()
     sig_stop = QtCore.pyqtSignal()
@@ -34,6 +31,7 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         self.cfg = config
         
         logger.info('Window thread ID at Startup: '+str(int(QtCore.QThread.currentThreadId())))
+        print('Window thread ID at Startup: '+str(int(QtCore.QThread.currentThreadId())))
         logger.info('Ideal thread count: '+str(int(QtCore.QThread.idealThreadCount())))
         
         ''' Set up the UI '''
@@ -47,14 +45,14 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         self.stopButton.clicked.connect(self.stop)
 
         ''' Setting up the state '''
-        self.state = SingletonStateObject()
+        self.state = AccordionSingletonStateObject()
         #print('Window State ID:', id(self.state))
         #print('Window Mutex ID: ', id(self.state.mutex))
         self.state.state_updated.connect(lambda string: print('Window thread received state update: ',string))
         # self.logger = SingletonLoggerObject('my_log_file.txt')
         # print('ID Window Logger: ', id(self.logger))
 
-        print(type(self.graphicsView))
+        #print(type(self.graphicsView))
 
         self.XY_plot_layout = self.graphicsView.addLayout(row=0, col=0, rowspan=2, colspan=1, border=(50,50,0))
         self.XY_plot = self.XY_plot_layout.addPlot()
@@ -79,7 +77,7 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         self.s4 = pg.ScatterPlotItem(
                     size=3,
                     pen=pg.mkPen(None),
-                    brush=pg.mkBrush(255, 255, 255, 20),
+                    brush=pg.mkBrush(255, 255, 255, 255),
                     hoverable=False,
                     hoverSymbol='s',
                     hoverSize=15,
@@ -87,23 +85,20 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
                     hoverBrush=pg.mkBrush('g'),
                     )
         
-        self.n = 10000
-        self.pos = np.random.normal(size=(2, self.n), scale=1e-9)
-
-        self.s4.addPoints(x=self.pos[0],
-                          y=self.pos[1],
-                            # size=(np.random.random(n) * 20.).astype(int),
-                            # brush=[pg.mkBrush(x) for x in np.random.randint(0, 256, (n, 3))],
-                            data=np.arange(self.n)
-                            )
+        self.s5 = pg.ScatterPlotItem(
+                    size=3,
+                    pen=pg.mkPen(None),
+                    brush=pg.mkBrush(255, 255, 128, 128),
+                    hoverable=False,
+                    hoverSymbol='s',
+                    hoverSize=15,
+                    hoverPen=pg.mkPen('r', width=2),
+                    hoverBrush=pg.mkBrush('g'),
+                    )
         
         self.XY_plot.addItem(self.s4)
-
-        self.clickedPen = pg.mkPen('b', width=2)
-        self.lastClicked = []    
-
-        # self.s4.sigClicked.connect(self.clicked)
-
+        self.XY_plot.addItem(self.s5)
+        
         ''' Set the thread up '''
         self.camera_thread = QtCore.QThread()
         self.camera_worker = AccordionCamera(self)
@@ -129,17 +124,15 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
     
     @QtCore.pyqtSlot(np.ndarray)
     def update_display(self, datachunk):
-        print('updating display')
-        pass
-        '''
-        self.ET_region.setZValue(10)
-        minX, maxX = self.ET_region.getRegion()
-        self.ET_plot.setXRange(minX, maxX, padding=0)
-        '''
+        self.s4.clear()
+        self.s4.setData(datachunk[:,0],datachunk[:,1])
+        self.s5.clear()
+        self.s5.setData(datachunk[:,0]+1,datachunk[:,1]+1)
 
+        
     def initialize_and_connect_menubar(self):
         self.actionExit_2.triggered.connect(self.close_app)
-        self.actionOpen_File.triggered.connect(self.load_dataset)
+        # self.actionOpen_File.triggered.connect(self.load_dataset)
     
     def close_app(self):
         self.__del__()
@@ -161,6 +154,7 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
 
     def start(self):
         self.sig_start.emit()
+        self.sig_prepare_live.emit()
         self.sig_run_live.emit()
 
     def stop(self):

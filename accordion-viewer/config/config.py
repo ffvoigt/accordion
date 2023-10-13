@@ -1,5 +1,7 @@
 ''' Configuration file template '''
 
+#eventbuffersize = 1000
+
 camera = 'DemoEventCamera' # 'DemoCamera' or 'PropheseeEVK4' 
 
 camera_parameters = {'x_pixels' : 1024,
@@ -7,7 +9,8 @@ camera_parameters = {'x_pixels' : 1024,
                      'x_pixel_size_in_microns' : 6.5,
                      'y_pixel_size_in_microns' : 6.5,
                      'events_per_chunk' : 500,
-                     'chunk_frequency_in_Hz' : 10,
+                     'off_events_per_chunk' : 200,
+                     'chunk_frequency_in_Hz' : 30,
                      'subsampling' : [1,2,4],
                      'camera_id' : 0,
                      'sensor_mode' : 12,    # 12 for progressive

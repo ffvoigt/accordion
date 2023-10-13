@@ -9,10 +9,10 @@ class AccordionSingletonStateObject():
     instance = None
 
     def __new__(cls):
-        if not SingletonStateObject.instance:
-            SingletonStateObject.instance = SingletonStateObject.__StateObject()
+        if not AccordionSingletonStateObject.instance:
+            AccordionSingletonStateObject.instance = AccordionSingletonStateObject.__StateObject()
 
-        return SingletonStateObject.instance
+        return AccordionSingletonStateObject.instance
 
     def __getattr__(self, name):
         print('getattr called')

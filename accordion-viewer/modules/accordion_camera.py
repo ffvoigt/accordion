@@ -6,9 +6,7 @@ import time
 import numpy as np
 from PyQt5 import QtCore, QtWidgets, QtGui
 
-from metavision_core.event_io.raw_reader import RawReader
-from metavision_core.event_io.py_reader import EventDatReader
-from metavision_core.event_io import EventsIterator
+from .accordion_state import AccordionSingletonStateObject
 
 import logging
 logger = logging.getLogger(__name__)
@@ -26,19 +24,17 @@ class AccordionCamera(QtCore.QObject):
         self.parent = parent # a AccordionCore() object
         self.cfg = parent.cfg
 
-        self.state = AccordionStateSingleton()
+        self.state = AccordionSingletonStateObject()
                 
-        #self.parent.sig_prepare_live.connect(self.prepare_live, type=QtCore.Qt.BlockingQueuedConnection)
-        self.parent.sig_run_live.connect(self.run_live)
-        self.parent.sig_stop.connect(self.end_live, type=QtCore.Qt.BlockingQueuedConnection)
-        #self.parent.sig_get_snap_image.connect(self.snap_image)
-
+        self.parent.sig_prepare_live.connect(self.prepare_live_mode)
+        self.parent.sig_run_live.connect(self.start_live_mode)
+        self.parent.sig_stop.connect(self.stop)
                 
         ''' Set up the camera '''
         if self.cfg.camera == 'DemoEventCamera':
             self.camera = AccordionDemoEventCamera(self)
-
-        self.camera.initialize_camera()
+        elif self.cfg.camera == 'PropheseeEventCamera':
+            self.camera = AccordionPropheseeEventCamera(self)
 
     def __del__(self):
         try:
@@ -67,34 +63,18 @@ class AccordionCamera(QtCore.QObject):
     @QtCore.pyqtSlot()
     def stop(self):
         ''' Stops acquisition '''
-        self.stopflag = True
-
+        self.camera.stopflag = True
 
     @QtCore.pyqtSlot()
-    def prepare_live(self):
-        self.camera.initialize_live_mode()
-        self.live_image_count = 0
-        self.start_time = time.time()
+    def start_live_mode(self):
+        self.camera.run_live_mode()
+
+    @QtCore.pyqtSlot()
+    def prepare_live_mode(self):
+        print('Preparing live mode')
         logger.info('Camera: Preparing Live Mode')
-
-    @QtCore.pyqtSlot()
-    def get_live_image(self):
-        images = self.camera.get_live_image()
-
-        for image in images:
-            image = np.rot90(image)
-
-            self.sig_camera_frame.emit(image[0:self.x_pixels:self.camera_display_live_subsampling,
-                                       0:self.y_pixels:self.camera_display_live_subsampling])
-            self.live_image_count += 1
-            #self.sig_camera_status.emit(str(self.live_image_count))
-
-    @QtCore.pyqtSlot()
-    def end_live(self):
-        self.camera.close_live_mode()
-        self.end_time = time.time()
-        framerate = (self.live_image_count + 1)/(self.end_time - self.start_time)
-        logger.info(f'Camera: Finished Live Mode: Framerate: {framerate:.2f}')
+        print('Camera Thread ID during prep live: '+str(int(QtCore.QThread.currentThreadId())))
+        self.camera.prepare_live_mode()
 
     @QtCore.pyqtSlot(bool)
     def snap_image(self, write_flag=True):
@@ -111,9 +91,9 @@ class AccordionGenericEventCamera(QtCore.QObject):
         super().__init__()
         self.parent = parent
         self.cfg = parent.cfg
+        self.state = AccordionSingletonStateObject()
 
-        #self.state = AccordionStateSingleton()
-
+        self.eventcount = 0
         self.stopflag = False
 
         self.x_pixels = self.cfg.camera_parameters['x_pixels']
@@ -121,78 +101,87 @@ class AccordionGenericEventCamera(QtCore.QObject):
         self.x_pixel_size_in_microns = self.cfg.camera_parameters['x_pixel_size_in_microns']
         self.y_pixel_size_in_microns = self.cfg.camera_parameters['y_pixel_size_in_microns']
         
-    def open_camera(self):
+    def initialize_camera(self):
         pass
 
     def close_camera(self):
         pass
 
-    def initialize_image_series(self):
+    def prepare_live_mode(self):
         pass
 
-    def get_images_in_series(self):
-        '''Should return a single numpy array'''
+    def run_live_mode(self):
         pass
 
-    def close_image_series(self):
+    def end_live_mode(self):
         pass
 
-    def get_image(self):
-        '''Should return a single numpy array'''
-        pass
-
-    def initialize_live_mode(self):
-        pass
-
-    def get_live_image(self):
-        pass
-
-    def close_live_mode(self):
-        pass
+    def stop(self):
+        self.stopflag = True
 
 class AccordionDemoEventCamera(AccordionGenericEventCamera):
     def __init__(self, parent = None):
         super().__init__(parent)
 
         self.eventcount = 0
+        self.parent = parent
 
         self.events_per_chunk = self.cfg.camera_parameters['events_per_chunk']
         self.chunk_frequency = self.cfg.camera_parameters['chunk_frequency_in_Hz']
-        timer_interval = int(np.divide(1,self.chunk_frequency)*1000)
+        self.timer_interval_in_ms = int(np.divide(1,self.chunk_frequency)*1000)
+        self.timer_interval_in_us = self.timer_interval_in_ms * 1000
 
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.process_data)
+        self.initialize_camera()
 
-    def open_camera(self):
-        logger.info('Initialized Demo Camera')
+    def initialize_camera(self):
+        logger.info('Initialized Demo Event Camera')
 
     def close_camera(self):
-        logger.info('Closed Demo Camera')
+        logger.info('Closed Demo Event Camera')
 
-    def initialize_live_mode(self):
-        self.timer.start(timer_interval)
+    def prepare_live_mode(self):
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.send_demo_data)
 
+    def run_live_mode(self):
+        self.eventcount = 0
+        self.timer.start(self.timer_interval_in_ms)
+    
     def process_data(self):
         pass
+
+    def send_demo_data(self):
+        if self.stopflag is not True:
+            datachunk = self._create_random_datachunk()
+            self.parent.sig_camera_datachunk.emit(datachunk)
+        else: 
+            self.timer.stop()
+            self.stopflag = False
     
     def _create_random_datachunk(self):
-        # move this to numba
-
         self.start_time = time.time()*1E6 # Time in us
-        event_coordinates = np.random.randint(500,2)
-        data = 
+        
+        event_x_coordinates = np.random.randint(0,self.x_pixels, self.events_per_chunk)
+        event_y_coordinates = np.random.randint(0,self.y_pixels, self.events_per_chunk)
+        # 0 = OFF, 1= ON
+        event_type = np.random.randint(0,2,self.events_per_chunk)
+        event_times = np.sort(np.random.randint(0,self.timer_interval_in_us,self.events_per_chunk))
+        event_times = self.start_time + event_times
 
-        self.x_pixels
-        self.y_pixels
-
-        data = np.array([np.roll(self.line, 4*i+self.count) for i in range(0, self.y_pixels)], dtype='uint16')
-        data = data + (np.random.normal(size=(self.x_pixels, self.y_pixels))*100)
-        data = np.around(data).astype('uint16')
-        self.count += 20
-        return data
+        datachunk = np.stack((event_x_coordinates, event_y_coordinates, event_type, event_times)).T
+        self.eventcount += self.events_per_chunk
+        return datachunk
 
     def get_image(self):
         return self._create_random_image()
+    
+class AccordionPropheseeEventCamera(AccordionGenericEventCamera):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        from metavision_core.event_io.raw_reader import RawReader
+        from metavision_core.event_io.py_reader import EventDatReader
+        from metavision_core.event_io import EventsIterator
 
     
 
