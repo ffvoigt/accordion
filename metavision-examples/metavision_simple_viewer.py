@@ -20,7 +20,7 @@ import os
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Metavision Simple Viewer sample.',
+    parser = argparse.ArgumentParser(description='Metavision Simple Viewer Example.',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         '-i', '--input-raw-file', dest='input_path', default="",
