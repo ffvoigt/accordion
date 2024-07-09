@@ -1,5 +1,5 @@
 '''
-Accordion Image Processor class, intended to run in the Camera Thread and handle file I/O
+mesoSPIM Image Writer class, intended to run in the Camera Thread and handle file I/O
 '''
 
 import os
@@ -11,33 +11,37 @@ logger = logging.getLogger(__name__)
 import sys
 from PyQt5 import QtCore
 from distutils.version import StrictVersion
+from .accordion_state import AccordionSingletonStateObject
+#import npy2bdvv
+#from .utils.acquisitions import AcquisitionList, Acquisition
 
-class AccordionImageProcessor(QtCore.QObject):
+
+class Accordion_ImageWriter(QtCore.QObject):
     def __init__(self, parent=None):
-        '''Image and metadata writer class. Parent is AccordionCamera() object'''
+        '''Image and metadata writer class. Parent is Accordion_Camera() object'''
         super().__init__()
 
         self.parent = parent # a mesoSPIM_Camera() object
         self.cfg = parent.cfg
 
-        #self.state = mesoSPIM_StateSingleton()
+        self.state = AccordionSingletonStateObject()
         self.running = False
 
-        #self.x_pixels = self.cfg.camera_parameters['x_pixels']
-        #self.y_pixels = self.cfg.camera_parameters['y_pixels']
+        self.x_pixels = self.cfg.camera_parameters['x_pixels']
+        self.y_pixels = self.cfg.camera_parameters['y_pixels']
 
-        #self.binning_string = self.cfg.camera_parameters['binning'] # Should return a string in the form '2x4'
-        #self.x_binning = int(self.binning_string[0])
-        #self.y_binning = int(self.binning_string[2])
+        self.binning_string = self.cfg.camera_parameters['binning'] # Should return a string in the form '2x4'
+        self.x_binning = int(self.binning_string[0])
+        self.y_binning = int(self.binning_string[2])
 
-        #self.x_pixels = int(self.x_pixels / self.x_binning)
-        #self.y_pixels = int(self.y_pixels / self.y_binning)
+        self.x_pixels = int(self.x_pixels / self.x_binning)
+        self.y_pixels = int(self.y_pixels / self.y_binning)
 
-        #self.file_extension = ''
-        #self.bdv_writer = self.tiff_writer = self.tiff_mip_writer = self.mip_image = None
-        #self.tiff_aliases = ('.tif', '.tiff')
-        #self.bigtiff_aliases = ('.btf', '.tf2', '.tf8')
-        #self.check_versions()
+        self.file_extension = ''
+        self.bdv_writer = self.tiff_writer = self.tiff_mip_writer = self.mip_image = None
+        self.tiff_aliases = ('.tif', '.tiff')
+        self.bigtiff_aliases = ('.btf', '.tf2', '.tf8')
+        self.check_versions()
 
     def check_versions(self):
         """Take care of API changes in different library versions"""

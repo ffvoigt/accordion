@@ -28,24 +28,83 @@ class AccordionSingletonStateObject():
 
         def __init__(self):
             super().__init__()
-            self.spam = None
-                      
-            print('State ID:', id(self))
-            print('Mutex ID: ', id(self.mutex))
+            self._state_dict = {
+                            'state' : 'init', # 'init', 'idle' , 'live', 'snap', 'running_script'
+                            'camera_exposure_time':0.02,
+                            'camera_line_interval':0.000075,
+                            'camera_display_live_subsampling': 1,
+                            'camera_display_acquisition_subsampling': 2,
+                            'camera_binning':'1x1',
+                            'camera_sensor_mode':'ASLM',
+                            'current_framerate':3.8,
+                                 }
+            
+        def __len__(self):
+            return len(self._state_dict) 
+        
+        def __setitem__(self, key, value):
+            '''
+            Custom __setitem__ method to allow mutexed access to 
+            a state parameter. 
 
-            self.state_updated.connect(lambda string: print('StateObject: ', string))
-
-        def set_state(self, spam, wait_until_done=False):
-            print('set state called')
+            After the state has been changed, the updated signal is emitted.
+            '''
             with QtCore.QMutexLocker(self.mutex):
-                starttime = time.time() 
-                self.spam = spam
-                self.state_updated.emit('State is now: ' + str(spam))
-                if wait_until_done:
-                    time.sleep(2)
-                endtime = time.time() 
-                print('Delta t: ', endtime-starttime)
+                self._state_dict.__setitem__(key, value)
+            self.sig_updated.emit()
 
-        def get_state(self):
-            with QtCore.QMutexLocker(self.mutex): 
-                return self.spam
+        def __getitem__(self, key):
+            '''
+            Custom __getitem__ method to allow mutexed access to 
+            a state parameter.
+
+            To avoid the state being updated while a parameter is read.
+            '''
+
+            with QtCore.QMutexLocker(self.mutex):
+                return self._state_dict.__getitem__(key)
+            
+        def set_parameters(self, dict):
+            '''
+            Sometimes, several parameters should be set at once 
+            without allowing the state being updated while a parameter is read.
+            '''
+            with QtCore.QMutexLocker(self.mutex):
+                for key, value in dict.items():
+                    self._state_dict.__setitem__(key, value)
+            self.sig_updated.emit()
+
+        def get_parameter_dict(self, list):
+            '''
+            For a list of keys, get a state dict with the current values back.
+
+            All the values are read out under a QMutexLocker so that 
+            the state cannot be updated at the same time.
+            '''
+            return_dict = {}
+
+            with QtCore.QMutexLocker(self.mutex):
+                for key in list:
+                    return_dict[key] = self._state_dict.__getitem__(key)
+            
+            return return_dict
+
+        def get_parameter_list(self, list):
+            '''
+            For a list of keys, get a state list with the current values back.
+
+            This is especially useful for unpacking.
+
+            All the values are read out under a QMutexLocker so that 
+            the state cannot be updated at the same time.
+            '''
+            return_list = []
+
+            with QtCore.QMutexLocker(self.mutex):
+                for key in list:
+                    return_list.append(self._state_dict.__getitem__(key))
+            
+            return return_list
+
+        def block_signals(self, boolean):
+            self.blockSignals(boolean)

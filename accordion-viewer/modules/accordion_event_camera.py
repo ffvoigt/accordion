@@ -11,7 +11,7 @@ from .accordion_state import AccordionSingletonStateObject
 import logging
 logger = logging.getLogger(__name__)
 
-class AccordionCamera(QtCore.QObject):
+class AccordionEventCamera(QtCore.QObject):
     '''Top-level class for all cameras'''
     sig_camera_datachunk = QtCore.pyqtSignal(np.ndarray)
     sig_finished = QtCore.pyqtSignal()
@@ -28,12 +28,12 @@ class AccordionCamera(QtCore.QObject):
                 
         self.parent.sig_prepare_live.connect(self.prepare_live_mode)
         self.parent.sig_run_live.connect(self.start_live_mode)
-        self.parent.sig_stop.connect(self.stop)
+        self.parent.sig_end_live.connect(self.end_live_mode)
                 
         ''' Set up the camera '''
-        if self.cfg.camera == 'DemoEventCamera':
+        if self.cfg.event_camera == 'DemoEventCamera':
             self.camera = AccordionDemoEventCamera(self)
-        elif self.cfg.camera == 'PropheseeEventCamera':
+        elif self.cfg.event_camera == 'PropheseeEventCamera':
             self.camera = AccordionPropheseeEventCamera(self)
 
     def __del__(self):
@@ -61,9 +61,10 @@ class AccordionCamera(QtCore.QObject):
         pass
 
     @QtCore.pyqtSlot()
-    def stop(self):
+    def end_live_mode(self):
         ''' Stops acquisition '''
         self.camera.stopflag = True
+        self.camera.end_live_mode()
 
     @QtCore.pyqtSlot()
     def start_live_mode(self):
@@ -75,15 +76,7 @@ class AccordionCamera(QtCore.QObject):
         logger.info('Camera: Preparing Live Mode')
         print('Camera Thread ID during prep live: '+str(int(QtCore.QThread.currentThreadId())))
         self.camera.prepare_live_mode()
-
-    @QtCore.pyqtSlot(bool)
-    def snap_image(self, write_flag=True):
-        """"Snap an image and display it"""
-        image = self.camera.get_image()
-        self.sig_camera_frame.emit(image)
-        if write_flag:
-            self.image_writer.write_snap_image(image)
-
+    
 class AccordionGenericEventCamera(QtCore.QObject):
     ''' Generic Accordion camera class meant for subclassing.'''
 
@@ -96,10 +89,10 @@ class AccordionGenericEventCamera(QtCore.QObject):
         self.eventcount = 0
         self.stopflag = False
 
-        self.x_pixels = self.cfg.camera_parameters['x_pixels']
-        self.y_pixels = self.cfg.camera_parameters['y_pixels']
-        self.x_pixel_size_in_microns = self.cfg.camera_parameters['x_pixel_size_in_microns']
-        self.y_pixel_size_in_microns = self.cfg.camera_parameters['y_pixel_size_in_microns']
+        self.x_pixels = self.cfg.event_camera_parameters['x_pixels']
+        self.y_pixels = self.cfg.event_camera_parameters['y_pixels']
+        self.x_pixel_size_in_microns = self.cfg.event_camera_parameters['x_pixel_size_in_microns']
+        self.y_pixel_size_in_microns = self.cfg.event_camera_parameters['y_pixel_size_in_microns']
         
     def initialize_camera(self):
         pass
@@ -126,10 +119,12 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
         self.eventcount = 0
         self.parent = parent
 
-        self.events_per_chunk = self.cfg.camera_parameters['events_per_chunk']
-        self.chunk_frequency = self.cfg.camera_parameters['chunk_frequency_in_Hz']
+        self.events_per_chunk = self.cfg.event_camera_parameters['events_per_chunk']
+        self.chunk_frequency = self.cfg.event_camera_parameters['chunk_frequency_in_Hz']
         self.timer_interval_in_ms = int(np.divide(1,self.chunk_frequency)*1000)
         self.timer_interval_in_us = self.timer_interval_in_ms * 1000
+
+        self.timer_initialized = False
 
         self.initialize_camera()
 
@@ -140,12 +135,20 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
         logger.info('Closed Demo Event Camera')
 
     def prepare_live_mode(self):
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.send_demo_data)
+        if not self.timer_initialized:
+            self.timer = QtCore.QTimer(self)
+            self.timer.timeout.connect(self.send_demo_data)
+            self.timer_initialized = True
+
+        self.stopflag = False
 
     def run_live_mode(self):
         self.eventcount = 0
         self.timer.start(self.timer_interval_in_ms)
+
+    def end_live_mode(self):
+        self.stopflag = True
+        self.timer.stop()
     
     def process_data(self):
         pass
@@ -155,8 +158,7 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
             datachunk = self._create_random_datachunk()
             self.parent.sig_camera_datachunk.emit(datachunk)
         else: 
-            self.timer.stop()
-            self.stopflag = False
+            pass
     
     def _create_random_datachunk(self):
         self.start_time = time.time()*1E6 # Time in us
