@@ -332,7 +332,7 @@ class AccordionHamamatsuCamera(AccordionGenericFrameCamera):
             for aframe in frames:
                 image = aframe.getData()
                 image = np.reshape(image, (-1, 2048))
-                image = np.rot90(image)[::self.parent.camera_display_live_subsampling, ::self.parent.camera_display_live_subsampling]
+                image = image[::self.parent.camera_display_live_subsampling, ::self.parent.camera_display_live_subsampling]
 
                 self.parent.sig_camera_frame.emit(image)
 

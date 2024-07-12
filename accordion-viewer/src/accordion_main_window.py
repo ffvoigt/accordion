@@ -58,25 +58,17 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         self.XY_plot.setAspectLocked(True, ratio=1.77)
 
         self.frame_camera_image_item = self.frameCameraView.getImageItem()
-        self.frameCameraView.setLevels(100,4000)
+        self.frameCameraView.setLevels(100,600)
+        self.frameCameraView.setMinimumWidth(1000)
+
+        self.frame_camera_crop_image_item = self.frameCameraCropView.getImageItem()
+        self.frameCameraCropView.setLevels(100,600)
+        self.frameCameraCropView.setMinimumWidth(1000)
+        self.frameCameraCropView.ui.histogram.hide()
 
         self.histogram = self.frameCameraView.getHistogramWidget()
         self.histogram.setMinimumWidth(250)
         self.histogram.item.vb.setMaximumWidth(250)
-
-        # self.ET_region = pg.LinearRegionItem(values=[1000,2000])
-        # self.ET_region.setZValue(10) # Move item up 
-
-        # self.ET_region_selection_plot.addItem(self.ET_region, ignoreBounds = True)
-        # self.ET_plot.setAutoVisible(y=True)
-
-        #data1 = 10000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
-        #data2 = 15000 + 15000 * pg.gaussianFilter(np.random.random(size=10000), 10) + 3000 * np.random.random(size=10000)
-
-        #self.ET_plot.plot(data1, pen="r")
-        #self.ET_region_selection_plot.plot(data1, pen="r")
-
-        #self.ET_region.sigRegionChanged.connect(self.update)
 
         # ON Plot?
         self.s4 = pg.ScatterPlotItem(
@@ -104,6 +96,8 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         
         self.XY_plot.addItem(self.s4)
         self.XY_plot.addItem(self.s5)
+
+        self.initialize_crosshairs()
         
         ''' Set the thread up '''
         self.event_camera_thread = QtCore.QThread()
@@ -117,11 +111,9 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
 
         ''' Create the connections / signal switchboard '''
         self.event_camera_worker.sig_camera_datachunk.connect(self.update_event_display)
+        self.event_camera_worker.sig_roi_center.connect(self.update_roi_center)
         self.frame_camera_worker.sig_camera_frame.connect(self.update_frame_display)
         
-        #self.sig_live.connect(self.event_camera_worker.live)
-        #self.sig_stop.connect(self.event_camera_worker.stop)
-
         '''Start the thread'''
         self.event_camera_thread.start()
         self.frame_camera_thread.start()
@@ -152,12 +144,41 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         self.s5.setData(datachunk[:,0]+1,datachunk[:,1]+1)
 
     @QtCore.pyqtSlot(np.ndarray)
+    def update_roi_center(self, roi_center):
+        self.update_crosshairs(roi_center)
+
+    @QtCore.pyqtSlot(np.ndarray)
     def update_frame_display(self, image):
         self.frameCameraView.setImage(image, autoLevels=False, autoHistogramRange=False, autoRange=False)
 
     def initialize_and_connect_menubar(self):
         self.actionExit_2.triggered.connect(self.close_app)
         # self.actionOpen_File.triggered.connect(self.load_dataset)
+
+    def initialize_crosshairs(self):
+        self.crosspen = pg.mkPen({'color': "r", 'width': 1})
+        x_image_width = self.cfg.frame_camera_parameters['x_pixels']/self.cfg.startup['camera_display_live_subsampling']
+        y_image_width = self.cfg.frame_camera_parameters['y_pixels']/self.cfg.startup['camera_display_live_subsampling']
+        x_center = x_image_width/2
+        y_center = y_image_width/2
+        self.vLine = pg.InfiniteLine(pos=x_center, angle=90, movable=False, pen=self.crosspen)
+        self.hLine = pg.InfiniteLine(pos=y_center, angle=0, movable=False, pen=self.crosspen)
+        self.frameCameraView.addItem(self.vLine, ignoreBounds=True)
+        self.frameCameraView.addItem(self.hLine, ignoreBounds=True)
+
+        ''' Draw bounding rectangle as well '''
+
+        self.rect = pg.RectROI([0, 0], [x_image_width, y_image_width],pen=self.crosspen,movable=False, rotatable=False, resizable=False)
+        self.rect.translatable = False
+        for handle in self.rect.getHandles():
+            handle.pen.setWidth(0)  # Making handles invisible
+        self.frameCameraView.addItem(self.rect, ignoreBounds=True)
+
+    def update_crosshairs(self, roi_center):
+        x_image_width = self.cfg.frame_camera_parameters['x_pixels']/self.cfg.startup['camera_display_live_subsampling']
+        y_image_width = self.cfg.frame_camera_parameters['y_pixels']/self.cfg.startup['camera_display_live_subsampling']
+        self.vLine.setValue(roi_center[0]*x_image_width)
+        self.hLine.setValue(roi_center[1]*y_image_width)
     
     def close_app(self):
         self.__del__()

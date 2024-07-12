@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1374</width>
-    <height>802</height>
+    <height>840</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,18 +20,33 @@
       <property name="horizontalSpacing">
        <number>10</number>
       </property>
-      <item row="0" column="1" colspan="5">
-       <widget class="GraphicsLayoutWidget" name="eventCameraView"/>
+      <item row="0" column="6">
+       <widget class="ImageView" name="frameCameraView"/>
       </item>
-      <item row="1" column="5">
-       <widget class="QProgressBar" name="progressBar">
+      <item row="0" column="7">
+       <widget class="ImageView" name="frameCameraCropView"/>
+      </item>
+      <item row="2" column="1">
+       <widget class="QCheckBox" name="FullFrameCheckBox">
         <property name="font">
          <font>
           <pointsize>16</pointsize>
          </font>
         </property>
-        <property name="value">
-         <number>0</number>
+        <property name="text">
+         <string>Display Full Camera Frame</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="startButton">
+        <property name="font">
+         <font>
+          <pointsize>16</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Start</string>
         </property>
        </widget>
       </item>
@@ -59,15 +74,18 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QPushButton" name="startButton">
+      <item row="0" column="1" colspan="5">
+       <widget class="GraphicsLayoutWidget" name="eventCameraView"/>
+      </item>
+      <item row="1" column="5">
+       <widget class="QProgressBar" name="progressBar">
         <property name="font">
          <font>
           <pointsize>16</pointsize>
          </font>
         </property>
-        <property name="text">
-         <string>Start</string>
+        <property name="value">
+         <number>0</number>
         </property>
        </widget>
       </item>
@@ -83,8 +101,29 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="ImageView" name="frameCameraView"/>
+      <item row="2" column="2">
+       <widget class="QCheckBox" name="EventProcessingCheckBox">
+        <property name="font">
+         <font>
+          <pointsize>16</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Event Processing</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="3">
+       <widget class="QCheckBox" name="CropViewCheckBox">
+        <property name="font">
+         <font>
+          <pointsize>16</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Display Crop View</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
