@@ -4,6 +4,7 @@ Accordion Camera class, intended to run in its own thread
 
 import time
 import numpy as np
+from numba import jit
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 from .accordion_state import AccordionSingletonStateObject
@@ -116,7 +117,7 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
     def __init__(self, parent = None):
         super().__init__(parent)
 
-        self.eventcount = 0
+        # self.eventcount = 0
         self.parent = parent
 
         self.events_per_chunk = self.cfg.event_camera_parameters['events_per_chunk']
@@ -159,10 +160,11 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
             self.parent.sig_camera_datachunk.emit(datachunk)
         else: 
             pass
-    
-    def _create_random_datachunk(self):
-        self.start_time = time.time()*1E6 # Time in us
-        
+
+    def _create_random_datachunk(self, ):
+        start_time = time.time()*1E6 # Time in us
+        datachunk = create_random_datachunk(start_time, self.x_pixels, self.y_pixels, self.events_per_chunk, self.timer_interval_in_us)
+        '''
         event_x_coordinates = np.random.randint(0,self.x_pixels, self.events_per_chunk)
         event_y_coordinates = np.random.randint(0,self.y_pixels, self.events_per_chunk)
         # 0 = OFF, 1= ON
@@ -171,7 +173,8 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
         event_times = self.start_time + event_times
 
         datachunk = np.stack((event_x_coordinates, event_y_coordinates, event_type, event_times)).T
-        self.eventcount += self.events_per_chunk
+        # self.eventcount += self.events_per_chunk
+        '''
         return datachunk
 
     def get_image(self):
@@ -185,8 +188,11 @@ class AccordionPropheseeEventCamera(AccordionGenericEventCamera):
         from metavision_core.event_io.py_reader import EventDatReader
         from metavision_core.event_io import EventsIterator
 
-    
-
-
-
-    
+@jit(nopython=True)    
+def create_random_datachunk(start_time, x_pixels, y_pixels, events_per_chunk, timer_interval_in_us):
+    event_x_coordinates = np.random.randint(0,x_pixels, events_per_chunk)
+    event_y_coordinates = np.random.randint(0,y_pixels, events_per_chunk)
+    event_type = np.random.randint(0,2,events_per_chunk)
+    event_times = np.sort(np.random.randint(0,timer_interval_in_us,events_per_chunk))
+    event_times = start_time + event_times
+    return np.stack((event_x_coordinates, event_y_coordinates, event_type, event_times)).T

@@ -272,7 +272,7 @@ class AccordionDemoFrameCamera(AccordionGenericFrameCamera):
 
         self.timer_initialized = False
 
-        self.timer_interval_in_ms = 10
+        self.timer_interval_in_ms = 50
 
     def open_camera(self):
         logger.info('Initialized Demo Camera')
@@ -412,3 +412,4 @@ class AccordionHamamatsuCamera(AccordionGenericFrameCamera):
 
     def close_live_mode(self):
         self.hcam.stopAcquisition()
+
