@@ -164,17 +164,7 @@ class AccordionDemoEventCamera(AccordionGenericEventCamera):
     def _create_random_datachunk(self, ):
         start_time = time.time()*1E6 # Time in us
         datachunk = create_random_datachunk(start_time, self.x_pixels, self.y_pixels, self.events_per_chunk, self.timer_interval_in_us)
-        '''
-        event_x_coordinates = np.random.randint(0,self.x_pixels, self.events_per_chunk)
-        event_y_coordinates = np.random.randint(0,self.y_pixels, self.events_per_chunk)
-        # 0 = OFF, 1= ON
-        event_type = np.random.randint(0,2,self.events_per_chunk)
-        event_times = np.sort(np.random.randint(0,self.timer_interval_in_us,self.events_per_chunk))
-        event_times = self.start_time + event_times
-
-        datachunk = np.stack((event_x_coordinates, event_y_coordinates, event_type, event_times)).T
-        # self.eventcount += self.events_per_chunk
-        '''
+        
         return datachunk
 
     def get_image(self):

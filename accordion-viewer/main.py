@@ -9,7 +9,7 @@ import qdarkstyle
 
 from PyQt5 import QtWidgets
 
-from modules.accordion_main_window import AccordionMainWindow
+from src.accordion_main_window import AccordionMainWindow
 import config.config as cfg
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
