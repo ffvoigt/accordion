@@ -6,7 +6,9 @@ startup = {
                             'camera_exposure_time':0.01,
                             'camera_display_live_subsampling': 2,
                             'camera_display_acquisition_subsampling':2,
-                            'event_processing_enabled': True,     
+                            'event_processing_enabled': True,
+                            'display_full_camera_frame': False,
+                            'camera_frame_cropping_enabled': True,     
             }
 
 
@@ -47,6 +49,8 @@ frame_camera_parameters = { 'x_pixels' : 2048,
                             'y_pixels' : 2048,
                             'x_pixel_size_in_microns' : 6.5,
                             'y_pixel_size_in_microns' : 6.5,
+                            'x_roi_pixels':256,
+                            'y_roi_pixels':256,
                             'binning' : '1x1',
                             'camera_id' : 0,
                             'sensor_mode' : 1,    # 12 for progressive

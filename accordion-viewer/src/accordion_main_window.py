@@ -25,6 +25,7 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
     sig_run_acq = QtCore.pyqtSignal()
     sig_end_live = QtCore.pyqtSignal()
     sig_stop = QtCore.pyqtSignal()
+    sig_roi_center = QtCore.pyqtSignal(np.ndarray)
 
     def __init__(self, config):
         super().__init__()
@@ -57,18 +58,32 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         # self.ET_region_selection_plot = self.graphicsView.addPlot(row=3, col=0, rowspan=1, colspan=1, border=(50,50,0))
         self.XY_plot.setAspectLocked(True, ratio=1.77)
 
+        ''' Modify Frame Camera View '''
         self.frame_camera_image_item = self.frameCameraView.getImageItem()
         self.frameCameraView.setLevels(100,600)
         self.frameCameraView.setMinimumWidth(1000)
+         # Hide Histogram if camera image isn't displayed
+        if not self.cfg.startup['display_full_camera_frame']:
+            self.frameCameraView.ui.histogram.hide()
+        # Hide the buttons below the histogram
+        self.frameCameraView.ui.roiBtn.hide()     
+        self.frameCameraView.ui.menuBtn.hide()     
+        self.frameCameraViewHistogram = self.frameCameraView.getHistogramWidget()
+        self.frameCameraViewHistogram.setMinimumWidth(200)
+        self.frameCameraViewHistogram.item.vb.setMaximumWidth(200)
 
+        ''' Modify Crop View '''
         self.frame_camera_crop_image_item = self.frameCameraCropView.getImageItem()
         self.frameCameraCropView.setLevels(100,600)
         self.frameCameraCropView.setMinimumWidth(1000)
-        self.frameCameraCropView.ui.histogram.hide()
+        # self.frameCameraCropView.ui.histogram.hide() # Hide Histogram if necessary
+        # Hide the buttons below the histogram
+        self.frameCameraCropView.ui.roiBtn.hide()     
+        self.frameCameraCropView.ui.menuBtn.hide()    
+        self.frameCameraCropViewHistogram = self.frameCameraView.getHistogramWidget()
+        self.frameCameraCropViewHistogram.setMinimumWidth(200)
+        self.frameCameraCropViewHistogram.item.vb.setMaximumWidth(200)
 
-        self.histogram = self.frameCameraView.getHistogramWidget()
-        self.histogram.setMinimumWidth(250)
-        self.histogram.item.vb.setMaximumWidth(250)
 
         # ON Plot?
         self.s4 = pg.ScatterPlotItem(
@@ -113,6 +128,7 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
         self.event_camera_worker.sig_camera_datachunk.connect(self.update_event_display)
         self.event_camera_worker.sig_roi_center.connect(self.update_roi_center)
         self.frame_camera_worker.sig_camera_frame.connect(self.update_frame_display)
+        self.frame_camera_worker.sig_camera_crop_frame.connect(self.update_frame_crop_display)
         
         '''Start the thread'''
         self.event_camera_thread.start()
@@ -145,11 +161,16 @@ class AccordionMainWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(np.ndarray)
     def update_roi_center(self, roi_center):
+        self.sig_roi_center.emit(roi_center)
         self.update_crosshairs(roi_center)
 
     @QtCore.pyqtSlot(np.ndarray)
     def update_frame_display(self, image):
         self.frameCameraView.setImage(image, autoLevels=False, autoHistogramRange=False, autoRange=False)
+
+    @QtCore.pyqtSlot(np.ndarray)
+    def update_frame_crop_display(self, image):
+        self.frameCameraCropView.setImage(image, autoLevels=False, autoHistogramRange=False, autoRange=False)
 
     def initialize_and_connect_menubar(self):
         self.actionExit_2.triggered.connect(self.close_app)

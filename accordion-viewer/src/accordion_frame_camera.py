@@ -14,6 +14,7 @@ from .accordion_state import AccordionSingletonStateObject
 class AccordionFrameCamera(QtCore.QObject):
     '''Top-level class for all cameras'''
     sig_camera_frame = QtCore.pyqtSignal(np.ndarray)
+    sig_camera_crop_frame = QtCore.pyqtSignal(np.ndarray)
     sig_finished = QtCore.pyqtSignal()
     sig_update_gui_from_state = QtCore.pyqtSignal(bool)
     sig_status_message = QtCore.pyqtSignal(str)
@@ -34,6 +35,10 @@ class AccordionFrameCamera(QtCore.QObject):
         self.x_pixel_size_in_microns = self.cfg.frame_camera_parameters['x_pixel_size_in_microns']
         self.y_pixel_size_in_microns = self.cfg.frame_camera_parameters['y_pixel_size_in_microns']
 
+        self.roi_center = [0.5,0.5]
+        self.x_roi_pixels = self.cfg.frame_camera_parameters['x_roi_pixels']
+        self.y_roi_pixels = self.cfg.frame_camera_parameters['y_roi_pixels']
+
         self.binning_string = self.cfg.frame_camera_parameters['binning'] # Should return a string in the form '2x4'
         self.x_binning = int(self.binning_string[0])
         self.y_binning = int(self.binning_string[2])
@@ -45,12 +50,14 @@ class AccordionFrameCamera(QtCore.QObject):
 
         self.camera_display_live_subsampling = self.cfg.startup['camera_display_live_subsampling']
         self.camera_display_acquisition_subsampling = self.cfg.startup['camera_display_acquisition_subsampling']
+        self.camera_frame_cropping_enabled = self.cfg.startup['camera_frame_cropping_enabled']
+        self.display_full_camera_frame = self.cfg.startup['display_full_camera_frame']
 
         ''' Wiring signals '''
-        
         self.parent.sig_prepare_live.connect(self.prepare_live)
         self.parent.sig_run_live.connect(self.run_live)
         self.parent.sig_end_live.connect(self.end_live)
+        self.parent.sig_roi_center.connect(self.update_roi_center)
 
         ''' Set up the camera '''
         if self.cfg.frame_camera == 'HamamatsuOrca':
@@ -122,6 +129,10 @@ class AccordionFrameCamera(QtCore.QObject):
         self.end_time = time.time()
         framerate = (self.live_image_count + 1)/(self.end_time - self.start_time)
         logger.info(f'Camera: Finished Live Mode: Framerate: {framerate:.2f}')
+
+    @QtCore.pyqtSlot(np.ndarray)
+    def update_roi_center(self, roi_center):
+        self.roi_center = roi_center
 
 
 class AccordionGenericFrameCamera(QtCore.QObject):
@@ -325,6 +336,12 @@ class AccordionHamamatsuCamera(AccordionGenericFrameCamera):
 
     def run_live_mode(self):
         i = 0
+
+        x_roi_halfwidth = int(self.parent.cfg.frame_camera_parameters['x_roi_pixels']/2)
+        y_roi_halfwidth = int(self.parent.cfg.frame_camera_parameters['y_roi_pixels']/2)
+        x_pixels = self.parent.cfg.frame_camera_parameters['x_pixels']
+        y_pixels = self.parent.cfg.frame_camera_parameters['y_pixels']
+
         start_time = time.time()
         while self.stopflag is False:
             [frames, dims] = self.hcam.getFrames()
@@ -332,9 +349,17 @@ class AccordionHamamatsuCamera(AccordionGenericFrameCamera):
             for aframe in frames:
                 image = aframe.getData()
                 image = np.reshape(image, (-1, 2048))
-                image = image[::self.parent.camera_display_live_subsampling, ::self.parent.camera_display_live_subsampling]
 
-                self.parent.sig_camera_frame.emit(image)
+                if self.parent.camera_frame_cropping_enabled:
+                    x_center = int(self.parent.roi_center[0]*x_pixels)
+                    y_center = int(self.parent.roi_center[1]*y_pixels)
+
+                    cropped_frame = image[x_center-x_roi_halfwidth:x_center+x_roi_halfwidth,y_center-y_roi_halfwidth:y_center+y_roi_halfwidth]
+                    self.parent.sig_camera_crop_frame.emit(cropped_frame)
+
+                if self.parent.display_full_camera_frame:
+                    image = image[::self.parent.camera_display_live_subsampling, ::self.parent.camera_display_live_subsampling]
+                    self.parent.sig_camera_frame.emit(image)
 
                 i += 1
 

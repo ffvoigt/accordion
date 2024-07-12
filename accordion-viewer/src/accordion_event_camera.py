@@ -224,7 +224,6 @@ def create_spiral_datachunk(start_time, x_pixels, y_pixels, events_per_chunk, ti
     event_times = start_time + event_times
     return np.stack((event_x_coordinates, event_y_coordinates, event_type, event_times)).T
 
-
 def datachunk_to_normalized_roi(datachunk,x_pixels, y_pixels):
     ''' Calculates the x and y mean of the event datachunk and divides it by the image size to get 
         a relative measure
